@@ -4,9 +4,11 @@ import re
 import MySQLdb
 import time
 import os
-import tplink
+#import tplink
 import sys
 import traceback
+import chinanet
+import random
 
 def soup(url):
     temp = s.get(url)
@@ -55,7 +57,7 @@ try_times = 0
 #获取豆瓣一页中帖子url
 #p = 1748
 p=1
-while p < 10000:
+while p < 4000:
     try:
         #把每页的帖子整合到url_tuple中
         url_tuple = []
@@ -74,6 +76,9 @@ while p < 10000:
         for url in url_tuple:
             if int(re.search('\d+',url).group()) in exists:
                 continue
+            if 'sort=new' in url:
+                continue
+            
             i = 1
             r = s.get(url)
             if r.status_code !=200:
@@ -82,7 +87,8 @@ while p < 10000:
                 print(url,p,'\033[34m%s\033[0m'%time.ctime())
                 try_times+=1
                 p+=1
-                net = tplink.tplink()
+            
+                net = chinanet.chinanet()
                 if net == 1:
                     break
                 #重新设置session
@@ -101,7 +107,7 @@ while p < 10000:
                 print('ip gg1','\033[34m%s\033[0m'%time.ctime())
                 try_times+=1
                 p+=1
-                net_sub=tplink.tplink()
+                net_sub=chinanet.chinanet()
                 if net_sub == 1:
                     break
                 continue
@@ -158,7 +164,7 @@ while p < 10000:
                         
                         if reply_id_url_eng == reply_id_url:
                             reply_id_url_eng = ''
-                        reply_time = floor.h4.span.text 
+                        reply_time = floor.h4.find(class_='pubtime').text 
                             
                         pages = i
                         #逐个加入数据库副表
@@ -166,23 +172,27 @@ while p < 10000:
     
                 if total_page!=1:
                     url_page = 'https://www.douban.com/group/topic/%s/?start=%d00'%(post_url,i)
+                    time.sleep(random.uniform(0.6,2))
                     rr = s.get(url_page)
                     soup_page = bs4.BeautifulSoup(rr.text,'html.parser')
+                    
                 i+=1
             
             db.commit()
+            time.sleep(random.uniform(0.6,2))
             
         p+=1
     except AttributeError as e:
         print(e,'ip gg','\033[34m%s\033[0m'%time.ctime())
         print(p)
-        if try_times>=1:
+        if try_times>=10:
             break
 #        p,try_times = restart(p,try_times)
         try_times+=1
         p+=1
-        net = tplink.tplink()
+        net = chinanet.chinanet()
         if net == 1:
+
             break
         #重新设置session
         s = requests.Session()
@@ -205,6 +215,9 @@ while p < 10000:
         print(traceback.extract_tb(c))
         print('p值为：',p)
         break
+    
+    
+    time.sleep(random.uniform(0.5,2))
 
     
 sql1 = 'select * from post;'
