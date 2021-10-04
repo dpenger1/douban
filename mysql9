@@ -1,0 +1,21 @@
+
+create database douban;
+
+drop table douban_topic;
+create table douban_topic(topic_id int,
+poster_id varchar(100),
+poster_name varchar(100),
+topic_content varchar(100),
+reply_num int
+);
+
+create table douban_reply (topic_id int,
+replyer varchar(100),
+replyer_id varchar(100),
+reply_content varchar(100)
+ );
+ 
+use douban;
+select * from douban_topic;
+select * from douban_topic where poster_id='https://www.douban.com/people/205376874/';
+select * from douban_topic where topic_content like '%🚗%';
