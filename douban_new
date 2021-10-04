@@ -1,0 +1,123 @@
+import requests
+import pymysql
+import pyquery
+import traceback
+from time import sleep
+import tplink
+# tplink.tplink()
+
+class DoubanSpyder:
+    def __init__(self):
+        self.db, self.cursor = self.connect_mysql()
+        self.s = requests.Session()
+        self.s.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36',
+            'Host': 'www.douban.com',
+            'Connection':'keep-alive',
+            'Accept-Language':'zh - CN, zh;q = 0.9',
+            'Accept':'text / html, application / xhtml + xml, application / xml;q = 0.9, image / avif, image / webp, image / apng, * / *;q = 0.8, application / signed - exchange;v = b3;q = 0.9',
+
+        })
+        r = self.s.get('http://www.douban.com')
+        # self.s.get('https://www.douban.com/group/explore')
+        # self.s.get('https://www.douban.com/group/search?cat=1019&q=%E7%94%9F%E6%B4%BB%E7%BB%84')
+        # self.s.get('https://www.douban.com/group/586674/')
+        # self.s.get('https://www.douban.com/group/586674/discussion?start=50')
+        # print(r.status_code)
+
+    def auto_run(self):
+        start_page = 0
+        end_page = 10
+        for i in range(start_page, end_page):
+            url = 'http://www.douban.com/group/586674/discussion?start=%i' % (i * 25)
+            print('正在爬取第%s页，url是%s' % (i + 1, url))
+            response = self.crawl_one_page(url)
+            if response.status_code != 200:
+                print(response.text)
+                break
+            print('sleep 30s')
+            sleep(30)
+
+    def crawl_one_page(self, url):
+        self.mysql_topic_id = self.load_mysql_topic_id()
+        response = self.requests_douban(url)
+        print(response.status_code)
+        tr_list = self.parse_response(response)
+        self.loop_tr_list(tr_list)
+        return response
+
+    def connect_mysql(self):
+        db = pymysql.connect(host='localhost', port=3306, user='root', password='dpenger', db='douban',
+                             charset='utf8mb4')
+        cursor = db.cursor()
+        return db, cursor
+
+    def query_sql_script(self, script):
+        self.cursor.execute(script)
+        data = self.cursor.fetchall()
+        return data
+
+    def insert_sql_script(self, script, data):
+        try:
+            self.cursor.execute(script, data)
+            self.db.commit()
+        except:
+            print(data)
+            traceback.print_exc()
+            with open('log.txt', 'a') as f:
+                f.write(str(data))
+
+    def spyder_douban(self):
+        pass
+
+    # 执行requests,获取response
+    def requests_douban(self, url):
+        response = self.s.get(url=url)
+        return response
+
+    # 用pyquery解析response
+    def parse_response(self, response):
+        q = pyquery.PyQuery(response.text)
+        _tr_list = q.find('.olt').children()
+        tr_list = _tr_list('.th').siblings()
+        return tr_list
+
+    # 对tr进行解析
+    def parse_tr(self, tr):
+        topic_content = tr('.title a').text()[:40]
+        topic_id = tr('.title a').attr('href').split('/')[-2]
+        poster_id = tr('[nowrap]')('a').attr('href')
+        reply_num = tr('.r-count').text()
+        poster_name = tr('[nowrap]')('a').text()
+        return topic_id, poster_id, poster_name, topic_content, reply_num
+
+    # 循环读取tr_list,并写入数据库
+    def loop_tr_list(self, tr_list):
+        for tr in tr_list.items():
+            topic_id, poster_id, poster_name, topic_content, reply_num = self.parse_tr(tr)
+            if reply_num == '':
+                reply_num = 0
+            print(topic_id, poster_id, poster_name, topic_content, reply_num)
+            script = 'INSERT INTO douban_topic VALUES (%s,%s,%s,%s,%s)'
+            data = (topic_id, poster_id, poster_name, topic_content, reply_num)
+            if (int(topic_id),) in self.mysql_topic_id:
+                continue
+            self.insert_sql_script(script, data)
+
+    # 读取数据库已有topic_id
+    def load_mysql_topic_id(self):
+        script = 'select topic_id from douban_topic'
+        topic_id = self.query_sql_script(script)
+        return topic_id
+
+
+# create table douban_reply (topic_id int,
+# replyer varchar(100),
+# replyer_id varchar(100),
+# reply_content varchar(100)
+#  );
+
+if __name__ == '__main__':
+    spyder = DoubanSpyder()
+    spyder.auto_run()
+
